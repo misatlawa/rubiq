@@ -1,23 +1,7 @@
-from os import path
+from os import path, strerror
+import errno
 
 import tensorflow as tf
-
-
-class AttrDict(dict):
-  __getattr__ = dict.__getitem__
-  __setattr__ = dict.__setitem__
-
-
-config = AttrDict(
-  {
-    "STATE_SIZE": 20 * 24,
-    "ACTION_SIZE": 6,
-    "HLAYERS": [100, 100, 100],
-    "DTYPE": tf.float32,
-    "OPTIMIZER": tf.train.GradientDescentOptimizer,
-    "LEARNING_RATE": 1e-3,
-  }
-)
 
 
 class Sequential:
@@ -54,8 +38,8 @@ class Sequential:
 
   def _states(self):
     return tf.placeholder(
-      shape=(None, self.config.STATE_SIZE),
-      dtype=self.config.DTYPE,
+      shape=(None, self.config.state_size),
+      dtype=self.config.dtype,
       name='States'
     )
 
@@ -68,14 +52,14 @@ class Sequential:
 
   def _values(self):
     return tf.placeholder(
-      shape=(None, self.config.ACTION_SIZE),
+      shape=(None, self.config.action_size),
       dtype=self.config.DTYPE,
       name='Values'
     )
 
   def _q_predictions(self):
     input_ = self.states
-    for output_size in self.config.HLAYERS:
+    for output_size in self.config.hidden_layers:
       input_ = tf.contrib.layers.fully_connected(
         inputs=input_,
         num_outputs=output_size,
@@ -84,29 +68,32 @@ class Sequential:
 
     return tf.contrib.layers.fully_connected(
       inputs=input_,
-      num_outputs=self.config.ACTION_SIZE,
+      num_outputs=self.config.action_size,
       activation_fn=None
     )
 
   def act(self, state):
     return self.cpu_session.run(
       fetches=self.action_prediction,
-      feed_dict={self.input: [state]}
+      feed_dict={self.states: [state]}
     )[0]
 
   def _loss(self):
     actions = tf.one_hot(
       self.actions,
-      self.config.ACTION_SIZE
+      self.config.action_size
     )
-    q_actions = tf.reduce_sum(tf.mul(actions, self.q_predictions), axis=1)
+    q_actions = tf.reduce_sum(
+      tf.math.multiply(actions, self.q_predictions),
+      axis=1
+    )
 
     return tf.reduce_mean(
       tf.square(q_actions - self.values)
     )
 
   def _train_op(self):
-    optimizer = self.config.OPTIMIZER(self.config.LEARNING_RATE)
+    optimizer = self.config.optimizer(self.config.learning_rate)
     return optimizer.minimize(
       self.loss,
       global_step=self.global_step
