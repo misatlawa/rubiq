@@ -1,26 +1,42 @@
 from os import path
 
-
 import tensorflow as tf
+
 
 class AttrDict(dict):
   __getattr__ = dict.__getitem__
   __setattr__ = dict.__setitem__
 
 
+config = AttrDict(
+  {
+    "STATE_SIZE": 20 * 24,
+    "ACTION_SIZE": 6,
+    "HLAYERS": [100, 100, 100],
+    "DTYPE": tf.float32,
+    "OPTIMIZER": tf.train.GradientDescentOptimizer,
+    "LEARNING_RATE": 1e-3,
+  }
+)
+
+
 class Sequential:
   def __init__(self, config):
     self.config = config
 
-    with tf.name_scope('Model'):
-      self.input = self._input()
-      self.q_values = self._q_values()
-      self.q_predictions = self._q_predictions()
-      self._action = tf.argmax(self.q_predictions, axis=1)
+    with tf.name_scope('Batch'):
+      self.states = self._states()
+      self.actions = self._actions()
+      self.values = self._values()
 
+    with tf.name_scope('Model'):
+      self.q_predictions = self._q_predictions()
+      self.action_prediction = tf.argmax(self.q_predictions, axis=1)
+
+    with tf.name_scope('Optimization'):
       self.global_step = tf.Variable(
         initial_value=0,
-        dtype=tf.int32,
+        dtype=tf.int64,
         name="step"
       )
       self.loss = self._loss()
@@ -36,47 +52,57 @@ class Sequential:
     self.session.run(self.init)
     self.cpu_session.run(self.init)
 
-  def _input(self):
+  def _states(self):
     return tf.placeholder(
       shape=(None, self.config.STATE_SIZE),
       dtype=self.config.DTYPE,
-      name='Input'
+      name='States'
     )
 
-  def _q_values(self):
+  def _actions(self):
+    return tf.placeholder(
+      shape=(None,),
+      dtype=tf.int32,
+      name='Actions'
+    )
+
+  def _values(self):
     return tf.placeholder(
       shape=(None, self.config.ACTION_SIZE),
       dtype=self.config.DTYPE,
-      name='Q-values'
+      name='Values'
     )
 
   def _q_predictions(self):
-    input_ = self.input
-    input_size = self.config.STATE_SIZE
-    for i, output_size in enumerate(self.config.LAYERS):
-      weights = tf.get_variable(
-        shape=(input_size, output_size),
-        dtype=config.DTYPE,
-        name='weight{0}'.format(i)
+    input_ = self.states
+    for output_size in self.config.HLAYERS:
+      input_ = tf.contrib.layers.fully_connected(
+        inputs=input_,
+        num_outputs=output_size,
+        activation_fn=tf.nn.relu
       )
-      bias = tf.get_variable(
-        shape=output_size,
-        dtype=config.DTYPE,
-        name='bias{0}'.format(i)
-      )
-      input_ = tf.nn.relu(tf.matmul(input_, weights) + bias)
-      input_size = output_size
-    return input_
 
-  def action(self, state):
-    return self.cpu_session.run(
-      fetches=self._action,
-      feed_dict={self.input: [state]}
+    return tf.contrib.layers.fully_connected(
+      inputs=input_,
+      num_outputs=self.config.ACTION_SIZE,
+      activation_fn=None
     )
 
+  def act(self, state):
+    return self.cpu_session.run(
+      fetches=self.action_prediction,
+      feed_dict={self.input: [state]}
+    )[0]
+
   def _loss(self):
+    actions = tf.one_hot(
+      self.actions,
+      self.config.ACTION_SIZE
+    )
+    q_actions = tf.reduce_sum(tf.mul(actions, self.q_predictions), axis=1)
+
     return tf.reduce_mean(
-      tf.square(self.q_predictions - self.q_values)
+      tf.square(q_actions - self.values)
     )
 
   def _train_op(self):
@@ -86,12 +112,13 @@ class Sequential:
       global_step=self.global_step
     )
 
-  def train(self, states, q_values):
+  def train(self, states, actions, values):
     loss, _ = self.session.run(
       fetches=(self.loss, self.train_op),
       feed_dict={
-        self.input: states,
-        self.q_values: q_values
+        self.states: states,
+        self.actions: actions,
+        self.values: values
       }
     )
     return loss
@@ -105,24 +132,8 @@ class Sequential:
     elif path.isfile:
       self.saver.restore(self.session, save_path=path_)
     else:
-      raise FileNotFoundError
-
-if __name__ == '__main__':
-  import numpy as np
-
-  config = AttrDict(
-    {
-      "STATE_SIZE": 20 * 24,
-      "ACTION_SIZE": 6,
-      "LAYERS": [100, 100, 100, 6],
-      "DTYPE": tf.float16,
-      "OPTIMIZER": tf.train.GradientDescentOptimizer,
-      "LEARNING_RATE": 1e-3
-    }
-  )
-  s = Sequential(config)
-  for _ in range(3000):
-    states = np.random.uniform(size=10*20*24)
-    states = np.reshape(states, newshape=(10, 20*24))
-    q_values = states[:, :6]
-    print(s.train(states, q_values))
+      raise FileNotFoundError(
+        errno.ENOENT,
+        os.strerror(errno.ENOENT),
+        path_
+      )
