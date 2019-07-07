@@ -17,3 +17,6 @@ class Cube:
     self.state = np.matmul(self.movements[move], self.state)
     if verbose:
       return self.state
+
+  def reset(self):
+    self.state = self.zerocube
