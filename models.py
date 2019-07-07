@@ -16,6 +16,7 @@ class Sequential:
     with tf.name_scope('Model'):
       self.q_predictions = self._q_predictions()
       self.action_prediction = tf.argmax(self.q_predictions, axis=1)
+      self.state_value_prediction = tf.reduce_max(self.q_predictions, axis=1)
 
     with tf.name_scope('Optimization'):
       self.global_step = tf.Variable(
@@ -52,8 +53,8 @@ class Sequential:
 
   def _values(self):
     return tf.placeholder(
-      shape=(None, self.config.action_size),
-      dtype=self.config.DTYPE,
+      shape=(None,),
+      dtype=self.config.dtype,
       name='Values'
     )
 
@@ -63,20 +64,22 @@ class Sequential:
       input_ = tf.contrib.layers.fully_connected(
         inputs=input_,
         num_outputs=output_size,
-        activation_fn=tf.nn.relu
+        activation_fn=tf.nn.sigmoid
       )
 
     return tf.contrib.layers.fully_connected(
       inputs=input_,
       num_outputs=self.config.action_size,
-      activation_fn=None
+      activation_fn=tf.nn.sigmoid,
+      biases_initializer=tf.constant_initializer(-1)
     )
 
   def act(self, state):
-    return self.cpu_session.run(
-      fetches=self.action_prediction,
+    action = self.cpu_session.run(
+      fetches=(self.action_prediction),
       feed_dict={self.states: [state]}
-    )[0]
+    )
+    return action[0]
 
   def _loss(self):
     actions = tf.one_hot(
@@ -87,7 +90,6 @@ class Sequential:
       tf.math.multiply(actions, self.q_predictions),
       axis=1
     )
-
     return tf.reduce_mean(
       tf.square(q_actions - self.values)
     )
@@ -121,6 +123,6 @@ class Sequential:
     else:
       raise FileNotFoundError(
         errno.ENOENT,
-        os.strerror(errno.ENOENT),
+        strerror(errno.ENOENT),
         path_
       )
