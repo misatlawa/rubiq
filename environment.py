@@ -43,5 +43,6 @@ class RubiksCubeEnvironment:
       reward = self.config.step_reward
     else:
       reward = self.config.fail_reward
-
+      is_terminal = True
+    self.counter += 1
     return reward, self.encoded_state(), is_terminal
