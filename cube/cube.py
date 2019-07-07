@@ -20,3 +20,9 @@ class Cube:
 
   def reset(self):
     self.state = self.zerocube
+
+  def sequencer(self, sequence, verbose=True):
+    for move in sequence:
+      self.move(move, verbose=False)
+    if verbose:
+      return self.state
