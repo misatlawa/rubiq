@@ -1,6 +1,6 @@
 import numpy as np
 from .movegen import movegen, get_zero_cube
-
+from random import choice
 
 class Cube:
 
@@ -8,6 +8,10 @@ class Cube:
     self.zerocube = get_zero_cube()
     self.state = self.zerocube
     self.movements = movegen()
+
+  @classmethod
+  def reverse_sequence(cls, sequence):
+    return sequence[::-1].swapcase()
 
   @property
   def solved(self):
@@ -26,3 +30,8 @@ class Cube:
       self.move(move, verbose=False)
     if verbose:
       return self.state
+
+  def shuffle(self, moves):
+    sequence = ''.join(choice(list(self.movements.keys())) for _ in range(moves))
+    self.sequencer(sequence)
+    return sequence
