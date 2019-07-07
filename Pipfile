@@ -10,7 +10,7 @@ bpython = "*"
 
 [packages]
 numpy = "*"
-
+ipython = "*"
 
 [requires]
 python_version = "3.7"
