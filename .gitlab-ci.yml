@@ -6,5 +6,5 @@ tests:
   script:
     - pip install --upgrade pip
     - pip install pipenv
-    - pipenv install
+    - pipenv install --dev
     - pipenv run coverage python -m unittest --verbose
