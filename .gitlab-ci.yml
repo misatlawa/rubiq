@@ -1,0 +1,10 @@
+stages:
+  - test
+tests:
+  image: "Python:3.7"
+  stage: test
+  script:
+    - pip install --upgrade pip
+    - pip install pipenv
+    - pipenv install
+    - python -m unittest --verbose
