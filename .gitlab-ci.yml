@@ -8,4 +8,4 @@ tests:
     - pip install pipenv
     - pipenv install --dev
     - pipenv run coverage run -m unittest --verbose
-    - pipenv run coverage report --omit='*/site-packages/*'
+    - pipenv run coverage report --omit='*/site-packages/*
