@@ -4,9 +4,9 @@ class AttrDict(dict):
   __getattr__ = dict.__getitem__
   __setattr__ = dict.__setitem__
 
-STATE_SIZE = 6*6*9
-ALLOWED_MOVES = ["L",  "R",  "U",  "D",  "F",  "B",
-                 "L'", "R'", "U'", "D'", "F'", "B'"]
+STATE_SIZE = 192
+ALLOWED_MOVES = ["L", "R", "U", "D", "F", "B",
+                 "l", "r", "u", "d", "f", "b"]
 
 model_config = AttrDict(
   {
