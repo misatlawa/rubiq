@@ -7,4 +7,4 @@ tests:
     - pip install --upgrade pip
     - pip install pipenv
     - pipenv install
-    - pipenv run python -m unittest --verbose
+    - pipenv run coverage python -m unittest --verbose
