@@ -30,12 +30,12 @@ class Sequential:
     cpu_config = tf.ConfigProto(
         device_count = {'GPU': 0}
     )
-    self.cpu_session = tf.Session(config=cpu_config)
+    #self.cpu_session = tf.Session(config=cpu_config)
     self.session = tf.Session()
     self.saver = tf.train.Saver()
     self.init = tf.global_variables_initializer()
     self.session.run(self.init)
-    self.cpu_session.run(self.init)
+    #self.cpu_session.run(self.init)
 
   def _states(self):
     return tf.placeholder(
@@ -71,11 +71,10 @@ class Sequential:
       inputs=input_,
       num_outputs=self.config.action_size,
       activation_fn=tf.nn.sigmoid,
-      biases_initializer=tf.constant_initializer(-1)
     )
 
   def act(self, state):
-    action = self.cpu_session.run(
+    action = self.session.run(
       fetches=(self.action_prediction),
       feed_dict={self.states: [state]}
     )
@@ -86,7 +85,7 @@ class Sequential:
       self.actions,
       self.config.action_size
     )
-    q_actions = tf.reduce_sum(
+    q_actions = tf.reduce_max(
       tf.math.multiply(actions, self.q_predictions),
       axis=1
     )

@@ -12,9 +12,9 @@ model_config = AttrDict(
   {
     "state_size": STATE_SIZE,
     "action_size": len(ALLOWED_MOVES),
-    "hidden_layers": [STATE_SIZE, 200, 100],
+    "hidden_layers": [STATE_SIZE, 100],
     "dtype": tf.float32,
-    "optimizer": tf.train.GradientDescentOptimizer,
+    "optimizer": tf.train.AdamOptimizer,
     "learning_rate": 1e-3,
     "batch_size": 200
   }
@@ -24,9 +24,9 @@ agent_config = AttrDict(
   {
     "state_size": STATE_SIZE,
     "action_size": len(ALLOWED_MOVES),
-    "memory_size": 10000,
+    "memory_size": 30000,
     "max_exploration_rate": 0.9,
-    "min_exploration_rate": 0.1,
+    "min_exploration_rate": 0.05,
     "gamma": 0.9
   }
 )
@@ -38,6 +38,6 @@ environment_config = AttrDict(
     "step_reward": -0.1,
     "success_reward": 1,
     "fail_reward": -1,
-    "max_steps": 5,
+    "max_steps": 50,
   }
 )
