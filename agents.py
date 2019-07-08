@@ -68,7 +68,7 @@ class DQNAgent:
     avg_length = Avg()
     avg_success = Avg()
     for _ in tqdm(range(n)):
-      l, s = agent.play_episode()
+      l, s = agent.play_episode(26, is_eval=True)
       avg_length.update(l)
       avg_success.update(s)
     print("evaluation success ratio: ", avg_success)
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     avg_length = Avg()
     avg_success = Avg()
     avg_loss = Avg()
-    for step in range(3000):
+    for step in range(6000):
       l, s = agent.play_episode(epoch)
       loss = agent.train_on_batch()
       avg_length.update(l)
@@ -94,11 +94,12 @@ if __name__ == "__main__":
             epoch, step, avg_loss, avg_length, avg_success
           )
         )
-    agent.exploration_rate = max(
-      agent_config.min_exploration_rate,
-      agent_config.max_exploration_rate * agent.exploration_rate,
-    )
-    agent.model.save_weights('weights/{}_{}_{}'.format(epoch, *agent.evaluation()))
+      if step % 1000 == 0:
+        agent.exploration_rate = max(
+          agent_config.min_exploration_rate,
+          agent_config.max_exploration_rate * agent.exploration_rate,
+        )
+        agent.model.save_weights('weights/e{}_s{}_{}'.format(epoch, step, agent.evaluation()[1]))
 
 
 
