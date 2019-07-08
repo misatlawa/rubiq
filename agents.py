@@ -99,7 +99,7 @@ if __name__ == "__main__":
           agent_config.min_exploration_rate,
           agent_config.max_exploration_rate * agent.exploration_rate,
         )
-        agent.model.save_weights('weights/e{}_s{}_{}'.format(epoch, step, agent.evaluation()[1]))
+        agent.model.save_weights('logdir/e{}_s{}_{}'.format(epoch, step, agent.evaluation()[1]))
 
 
 
