@@ -1,11 +1,11 @@
 import numpy as np
 
-zc = np.genfromtxt('matrices/ZEROCUBE.csv', delimiter=',', dtype=int)
+zc = np.genfromtxt('cube/matrices/ZEROCUBE.csv', delimiter=',', dtype=int)
 
 turns = ['RO', 'GB', 'YW', 'OTurn']
 
 turns_m = [
-  np.genfromtxt('matrices/{}.csv'.format(x), delimiter=',', dtype=int) for x in turns
+  np.genfromtxt('cube/matrices/{}.csv'.format(x), delimiter=',', dtype=int) for x in turns
 ]
 
 ro, gb, yw, oturn = turns_m
