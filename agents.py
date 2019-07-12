@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 from configs import model_config, agent_config, environment_config
 from environment import RubiksCubeEnvironment
-from models import Sequential
+from models import DoubleDQN
 
 
 class Avg:
@@ -27,7 +27,7 @@ class DQNAgent:
     self.config = config
     self.environment = RubiksCubeEnvironment(environment_config)
     self.exploration_rate = config.max_exploration_rate
-    self.model = Sequential(model_config)
+    self.model = DoubleDQN(model_config)
     self.memory = deque(maxlen=config.memory_size)
 
   def remember(self, state, action, reward, next_state):
@@ -100,7 +100,3 @@ if __name__ == "__main__":
           agent_config.max_exploration_rate * agent.exploration_rate,
         )
         agent.model.save_weights('logdir/e{}_s{}_{}'.format(epoch, step, agent.evaluation()[1]))
-
-
-
-
