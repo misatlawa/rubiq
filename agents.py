@@ -2,6 +2,7 @@ from collections import deque
 import numpy as np
 from random import sample
 from tqdm import tqdm
+from attrdict import AttrDefault
 
 from configs import model_config, agent_config, environment_config
 from environment import RubiksCubeEnvironment
@@ -38,7 +39,8 @@ class DQNAgent:
       return np.random.choice(range(self.config.action_size))
     return self.model.act(state)
 
-  def play_episode(self, difficulty, is_eval=False):
+  def play_episode(self, difficulty=None, is_eval=False):
+    difficulty = difficulty or np.random.randint(low=1, high=28)
     self.environment = RubiksCubeEnvironment(environment_config)
     self.environment.scramble(difficulty)
     state = self.environment.encoded_state()
@@ -67,8 +69,9 @@ class DQNAgent:
   def evaluation(self, n=1000):
     avg_length = Avg()
     avg_success = Avg()
-    for _ in tqdm(range(n)):
-      l, s = agent.play_episode(26, is_eval=True)
+    difficulties = np.random.randint(low=1, high=28, size=n)
+    for d in tqdm(difficulties):
+      l, s = agent.play_episode(d, is_eval=True)
       avg_length.update(l)
       avg_success.update(s)
     print("evaluation success ratio: ", avg_success)
@@ -79,16 +82,18 @@ if __name__ == "__main__":
   agent = DQNAgent(agent_config)
 
   for epoch in range(1, 50):
+    agent.exploration_rate = agent_config.max_exploration_rate
     avg_length = Avg()
     avg_success = Avg()
     avg_loss = Avg()
-    for step in range(6000):
-      l, s = agent.play_episode(epoch)
-      loss = agent.train_on_batch()
+
+    for step in range(20000):
+      l, s = agent.play_episode()
+      train_result = agent.train_on_batch()
       avg_length.update(l)
       avg_success.update(s)
-      avg_loss.update(loss)
-      if step % 10 == 0:
+      avg_loss.update(train_result and train_result.loss)
+      if step % 100 == 0:
         print(
           "epoch: {}; step: {}, loss: {}; len: {}, suc: {}".format(
             epoch, step, avg_loss, avg_length, avg_success
@@ -99,4 +104,4 @@ if __name__ == "__main__":
           agent_config.min_exploration_rate,
           agent_config.max_exploration_rate * agent.exploration_rate,
         )
-        agent.model.save_weights('logdir/e{}_s{}_{}'.format(epoch, step, agent.evaluation()[1]))
+        agent.model.save_weights('{}/e{}_s{}_{}'.format(model_config.logdir, epoch, step, agent.evaluation()[1]))
