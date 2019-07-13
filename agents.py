@@ -5,11 +5,11 @@ from tqdm import tqdm
 
 from configs import model_config, agent_config, environment_config
 from environment import RubiksCubeEnvironment
-from models import Sequential
+from models import DoubleDQN
 
 
 def sample_scramble(size=None):
-  return np.random.randint(low=3, high=30, size=size)
+  return np.random.randint(low=1, high=30, size=size)
 
 
 class Avg:
@@ -31,7 +31,7 @@ class DQNAgent:
     self.config = config
     self.environment = RubiksCubeEnvironment(environment_config)
     self.exploration_rate = config.max_exploration_rate
-    self.model = Sequential(model_config)
+    self.model = DoubleDQN(model_config)
     self.memory = deque(maxlen=config.memory_size)
 
   def remember(self, state, action, reward, next_state):
@@ -72,7 +72,7 @@ class DQNAgent:
     avg_length = Avg()
     avg_success = Avg()
     for _ in tqdm(range(n)):
-      l, s = agent.play_episode(26, is_eval=True)
+      l, s = agent.play_episode(is_eval=True)
       avg_length.update(l)
       avg_success.update(s)
     print("evaluation success ratio: ", avg_success)
@@ -88,10 +88,10 @@ if __name__ == "__main__":
     avg_loss = Avg()
     for step in range(6000):
       l, s = agent.play_episode()
-      loss = agent.train_on_batch()
+      train_result = agent.train_on_batch()
       avg_length.update(l)
       avg_success.update(s)
-      avg_loss.update(loss)
+      avg_loss.update(train_result and train_result.loss)
       if step % 10 == 0:
         print(
           "epoch: {}; step: {}, loss: {}; len: {}, suc: {}".format(
