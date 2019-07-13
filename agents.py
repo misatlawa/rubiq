@@ -8,6 +8,10 @@ from environment import RubiksCubeEnvironment
 from models import Sequential
 
 
+def sample_scramble(size=None):
+  return np.random.randint(low=3, high=30, size=size)
+
+
 class Avg:
   def __init__(self, value=0, n=0):
     self.value = value
@@ -38,9 +42,9 @@ class DQNAgent:
       return np.random.choice(range(self.config.action_size))
     return self.model.act(state)
 
-  def play_episode(self, difficulty, is_eval=False):
+  def play_episode(self, is_eval=False):
     self.environment = RubiksCubeEnvironment(environment_config)
-    self.environment.scramble(difficulty)
+    self.environment.scramble(sample_scramble())
     state = self.environment.encoded_state()
     is_terminal = False
     counter = 0
@@ -83,7 +87,7 @@ if __name__ == "__main__":
     avg_success = Avg()
     avg_loss = Avg()
     for step in range(6000):
-      l, s = agent.play_episode(epoch)
+      l, s = agent.play_episode()
       loss = agent.train_on_batch()
       avg_length.update(l)
       avg_success.update(s)
