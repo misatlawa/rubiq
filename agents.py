@@ -2,6 +2,7 @@ from collections import deque
 import numpy as np
 from random import sample
 from tqdm import tqdm
+import tensorflow as tf
 
 from configs import model_config, agent_config, environment_config
 from environment import RubiksCubeEnvironment
@@ -56,6 +57,7 @@ class DQNAgent:
       state = next_state
     return counter, reward > self.environment.config.fail_reward
 
+
   def train_on_batch(self):
     if len(self.memory) < self.model.config.batch_size:
       return
@@ -68,42 +70,35 @@ class DQNAgent:
     values = np.array(rewards) + self.config.gamma * next_state_values
     return self.model.train(states, actions, values)
 
-  def evaluation(self, n=1000):
+  def evaluation(self, n=300):
     avg_length = Avg()
     avg_success = Avg()
     for _ in tqdm(range(n)):
       l, s = agent.play_episode(is_eval=True)
       avg_length.update(l)
       avg_success.update(s)
-    print("evaluation success ratio: ", avg_success)
+
     return avg_length, avg_success
 
 
 if __name__ == "__main__":
   agent = DQNAgent(agent_config)
-
-  for epoch in range(1, 50):
-    avg_length = Avg()
-    avg_success = Avg()
-    avg_loss = Avg()
-    for step in range(6000):
-      l, s = agent.play_episode()
-      train_result = agent.train_on_batch()
-      avg_length.update(l)
-      avg_success.update(s)
-      avg_loss.update(train_result and train_result.loss)
-      if step % 10 == 0:
-        print(
-          "epoch: {}; step: {}, loss: {}; len: {}, suc: {}".format(
-            epoch, step, avg_loss, avg_length, avg_success
-          )
-        )
-      if step % 1000 == 0:
-        agent.exploration_rate = max(
-          agent_config.min_exploration_rate,
-          agent_config.max_exploration_rate * agent.exploration_rate,
-        )
-        agent.model.save_weights('logdir/e{}_s{}_{}'.format(epoch, step, agent.evaluation()[1]))
+  for step in range(100000):
+    l, s = agent.play_episode()
+    train_result = agent.train_on_batch()
+    if step % 10 == 0:
+      print(
+        "step: {}, loss: {}".format(step, train_result and train_result.loss)
+      )
+    if step % 300 == 0:
+      _, avg_success = agent.evaluation()
+      if train_result:
+        summary = tf.Summary(value=[
+          tf.Summary.Value(tag="success_rate", simple_value=avg_success.value),
+        ])
+        agent.model.writer.add_summary(summary, global_step=train_result.step)
+      if step % 3000 == 0:
+        agent.model.save_weights('{}/s{}_{}'.format(model_config.logdir, step, avg_success.value))
 
 
 

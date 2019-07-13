@@ -58,6 +58,13 @@ class Sequential:
       name='Values'
     )
 
+  def _mask(self):
+    return tf.placeholder(
+      shape=(None,),
+      dtype=self.config.dtype,
+      name='_mask'
+    )
+
   def _q_predictions(self):
     input_ = self.states
     for output_size in self.config.hidden_layers:
@@ -66,10 +73,11 @@ class Sequential:
         num_outputs=output_size,
         activation_fn=tf.nn.tanh
       )
-    q_predictions = tf.contrib.layers.fully_connected(
-      inputs=input_,
-      num_outputs=self.config.action_size,
-      activation_fn=tf.nn.tanh,
+    q_predictions = tf.layers.dense(
+      input_,
+      units=12,
+      activation=tf.nn.tanh,
+      use_bias=False
     )
     tf.summary.histogram('q_predictions', q_predictions)
     return q_predictions
