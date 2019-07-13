@@ -64,13 +64,13 @@ class Sequential:
       input_ = tf.contrib.layers.fully_connected(
         inputs=input_,
         num_outputs=output_size,
-        activation_fn=tf.nn.sigmoid
+        activation_fn=tf.nn.tanh
       )
 
     return tf.contrib.layers.fully_connected(
       inputs=input_,
       num_outputs=self.config.action_size,
-      activation_fn=tf.nn.sigmoid,
+      activation_fn=tf.nn.tanh,
     )
 
   def act(self, state):
