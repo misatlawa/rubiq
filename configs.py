@@ -27,8 +27,8 @@ agent_config = AttrDict(
     "state_size": STATE_SIZE,
     "action_size": len(ALLOWED_MOVES),
     "memory_size": 300000,
-    "max_exploration_rate": 0.1,
-    #"min_exploration_rate": 0.05,
+    "max_exploration_rate": 0.9,
+    "min_exploration_rate": 0.05,
     "gamma": 0.9,
   }
 )

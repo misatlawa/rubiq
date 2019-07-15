@@ -14,12 +14,14 @@ def sample_scramble(size=None):
 
 
 class Avg:
-  def __init__(self, value=0, n=0):
+  def __init__(self, value=None, n=0):
     self.value = value
     self.n = n
 
   def update(self, value):
     if value is not None:
+      if self.value is None:
+        self.value = 0
       self.value = (self.value * self.n + value) / (self.n + 1 )
       self.n = self.n + 1
 
@@ -57,7 +59,6 @@ class DQNAgent:
       state = next_state
     return counter, reward > self.environment.config.fail_reward
 
-
   def train_on_batch(self):
     if len(self.memory) < self.model.config.batch_size:
       return
@@ -70,36 +71,44 @@ class DQNAgent:
     values = np.array(rewards) + self.config.gamma * next_state_values
     return self.model.train(states, actions, values)
 
-  def evaluation(self, n=300):
+  def evaluation(self, n=None):
+    n = n or agent.model.config.weight_update_interval
     avg_length = Avg()
     avg_success = Avg()
     for _ in tqdm(range(n)):
       l, s = agent.play_episode(is_eval=True)
-      avg_length.update(l)
       avg_success.update(s)
+      if s:
+        avg_length.update(l)
 
     return avg_length, avg_success
 
 
 if __name__ == "__main__":
   agent = DQNAgent(agent_config)
-  for step in range(100000):
+  avg_success = Avg()
+
+  for _ in range(100000):
     l, s = agent.play_episode()
     train_result = agent.train_on_batch()
-    if step % 10 == 0:
-      print(
-        "step: {}, loss: {}".format(step, train_result and train_result.loss)
-      )
-    if step % 300 == 0:
-      _, avg_success = agent.evaluation()
-      if train_result:
+    if train_result:
+      if train_result.step % 100 == 0:
+        print(
+          "step: {}, loss: {}".format(train_result.step, train_result and train_result.loss)
+        )
+      if train_result.step % agent.model.config.weight_update_interval == 0:
+        avg_length, avg_success = agent.evaluation()
         summary = tf.Summary(value=[
           tf.Summary.Value(tag="success_rate", simple_value=avg_success.value),
+          tf.Summary.Value(tag="avg_length", simple_value=avg_length.value),
+          tf.Summary.Value(tag="exploration_rate", simple_value=agent.exploration_rate),
         ])
         agent.model.writer.add_summary(summary, global_step=train_result.step)
-      if step % 3000 == 0:
-        agent.model.save_weights('{}/s{}_{}'.format(model_config.logdir, step, avg_success.value))
+        agent.exploration_rate = max(agent.config.min_exploration_rate, agent.exploration_rate * 0.99)
 
-
-
-
+      if train_result.step % 3000 == 0:
+        agent.model.save_weights('{}/s{}_{}'.format(
+          agent.model.config.logdir,
+          train_result.step,
+          round(avg_success.value), 3)
+        )
