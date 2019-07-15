@@ -2,24 +2,32 @@ from os import path, strerror
 import errno
 
 from attrdict import AttrDict
+import numpy as np
 import tensorflow as tf
 
 
 class Sequential:
   def __init__(self, config):
     self.config = config
+    self.gamma = config.gamma
 
     with tf.name_scope('Batch'):
       self.states = self._states()
       self.actions = self._actions()
-      self.values = self._values()
+      self.rewards = self._rewards()
+      self.next_states = self._next_states()
+
+      self.mask = self._mask()
 
     with tf.name_scope('Model'):
-      self.q_predictions = self._q_predictions()
+      self.q_predictions = self._q_predictions(self.states)
       self.action_prediction = tf.argmax(self.q_predictions, axis=1)
-      self.state_value_prediction = tf.reduce_max(self.q_predictions, axis=1)
+
+      self.q_next_state = self._q_predictions(self.next_states)
+      self.next_state_value = tf.reduce_max(self.q_next_state)
 
     with tf.name_scope('Optimization'):
+
       self.global_step = tf.Variable(
         initial_value=0,
         dtype=tf.int64,
@@ -33,7 +41,6 @@ class Sequential:
 
     self.summary = tf.summary.merge_all()
     self.writer = tf.summary.FileWriter(config.logdir, self.session.graph)
-
     self.init = tf.global_variables_initializer()
     self.session.run(self.init)
 
@@ -51,11 +58,18 @@ class Sequential:
       name='Actions'
     )
 
-  def _values(self):
+  def _rewards(self):
     return tf.placeholder(
       shape=(None,),
       dtype=self.config.dtype,
-      name='Values'
+      name='Rewards'
+    )
+
+  def _next_states(self):
+    return tf.placeholder(
+      shape=(None, self.config.state_size),
+      dtype=self.config.dtype,
+      name='Next_states'
     )
 
   def _mask(self):
@@ -65,20 +79,22 @@ class Sequential:
       name='_mask'
     )
 
-  def _q_predictions(self):
-    input_ = self.states
-    for output_size in self.config.hidden_layers:
-      input_ = tf.contrib.layers.fully_connected(
-        inputs=input_,
-        num_outputs=output_size,
-        activation_fn=tf.nn.tanh
+  def _q_predictions(self, input_):
+    for i, output_size in enumerate(self.config.hidden_layers):
+      input_ = tf.layers.dense(
+        input_,
+        units=output_size,
+        activation=tf.nn.tanh,
+        name='Layer{}'.format(i),
+        reuse=tf.AUTO_REUSE,
       )
       tf.summary.histogram(input_.name, input_)
     q_predictions = tf.layers.dense(
       input_,
       units=12,
       activation=tf.nn.tanh,
-      use_bias=False
+      use_bias=False,
+      reuse=tf.AUTO_REUSE
     )
     tf.summary.histogram('q_predictions', q_predictions)
     return q_predictions
@@ -95,14 +111,19 @@ class Sequential:
       self.actions,
       self.config.action_size
     )
-    q_actions = tf.reduce_max(
+    q_predictions = tf.reduce_sum(
       tf.math.multiply(actions, self.q_predictions),
-      axis=1
+      axis=1,
+      name='q_predictions',
     )
-    loss = tf.reduce_mean(
-      tf.square(q_actions - self.values)
-    )
+    q_estimations = tf.add(self.rewards,  self.gamma * self.next_state_value, name='q_estimations')
+    error = tf.multiply((q_predictions - q_estimations), self.mask, name='error')
+    loss = tf.reduce_mean(tf.square(error), name='MSE_loss')
+
     tf.summary.scalar('loss', loss)
+    tf.summary.histogram('q_prediction', q_predictions)
+    tf.summary.histogram('q_estimation', q_estimations)
+
     return loss
 
   def _train_op(self):
@@ -112,15 +133,19 @@ class Sequential:
       global_step=self.global_step
     )
 
-  def train(self, states, actions, values):
-    loss, summary, _ = self.session.run(
-      fetches=(self.loss, self.summary, self.train_op),
+  def train(self, states, actions, rewards, next_states, mask_=None):
+    mask_ = mask_ if mask_ is not None else np.ones_like(rewards)
+    loss, step, summary, _ = self.session.run(
+      fetches=(self.loss, self.global_step, self.summary, self.train_op),
       feed_dict={
         self.states: states,
         self.actions: actions,
-        self.values: values
+        self.rewards: rewards,
+        self.next_states: next_states,
+        self.mask: mask_
       }
     )
+    self.writer.add_summary(summary, global_step=step)
     return AttrDict(locals())
 
   def save_weights(self, path_):

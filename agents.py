@@ -6,7 +6,7 @@ import tensorflow as tf
 
 from configs import model_config, agent_config, environment_config
 from environment import RubiksCubeEnvironment
-from models import DoubleDQN
+from models import Sequential
 
 
 def sample_scramble(size=None):
@@ -34,7 +34,7 @@ class DQNAgent:
     self.config = config
     self.environment = RubiksCubeEnvironment(environment_config)
     self.exploration_rate = config.max_exploration_rate
-    self.model = DoubleDQN(model_config)
+    self.model = Sequential(model_config)
     self.memory = deque(maxlen=config.memory_size)
 
   def remember(self, state, action, reward, next_state):
@@ -63,13 +63,9 @@ class DQNAgent:
     if len(self.memory) < self.model.config.batch_size:
       return
     batch = sample(self.memory, self.model.config.batch_size)
-    states, actions, rewards, next_states = zip(*batch)
-    next_state_values = self.model.session.run(
-      fetches=self.model.state_value_prediction,
-      feed_dict={self.model.states: next_states}
-    )
-    values = np.array(rewards) + self.config.gamma * next_state_values
-    return self.model.train(states, actions, values)
+    states, actions, rewards, next_states = map(np.array, zip(*batch))
+
+    return self.model.train(states, actions, rewards, next_states)
 
   def evaluation(self, n=None):
     n = n or agent.model.config.weight_update_interval
@@ -104,6 +100,7 @@ if __name__ == "__main__":
           tf.Summary.Value(tag="exploration_rate", simple_value=agent.exploration_rate),
         ])
         agent.model.writer.add_summary(summary, global_step=train_result.step)
+        agent.model.writer.flush()
         agent.exploration_rate = max(agent.config.min_exploration_rate, agent.exploration_rate * 0.99)
 
       if train_result.step % 3000 == 0:
