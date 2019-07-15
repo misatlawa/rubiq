@@ -126,15 +126,16 @@ class Sequential:
 
   def train(self, states, actions, rewards, next_states, mask_=None):
     mask_ = mask_ if mask_ is not None else np.ones_like(rewards)
-    loss, step, summary, _ = self.session.run(
-      fetches=(self.loss, self.global_step, self.summary, self.train_op),
-      feed_dict={
+    feed_dict = {
         self.states: states,
         self.actions: actions,
         self.rewards: rewards,
         self.next_states: next_states,
         self.mask: mask_
       }
+    loss, step, summary, _ = self.session.run(
+      fetches=(self.loss, self.global_step, self.summary, self.train_op),
+      feed_dict=feed_dict
     )
     self.writer.add_summary(summary, global_step=step)
     return AttrDict(locals())
@@ -177,19 +178,18 @@ class DoubleDQN(Sequential):
 
     with tf.variable_scope('Model') as scope:
       self.q_predictions = self._q_predictions(self.states)
-      self._model_variables = scope.trainable_variables()
-
       self.action_predictions = tf.argmax(self.q_predictions, axis=1)
       self.q_next_state = self._q_predictions(self.next_states, reuse=True)
 
+      self._model_variables = scope.trainable_variables()
+
     with tf.variable_scope("Target") as scope:
-      targets = self._q_predictions(self.next_states, reuse=False)
+      self.targets = self._q_predictions(self.next_states, reuse=False)
+      self.next_state_value = tf.reduce_sum(
+        self.targets * tf.one_hot(self.action_predictions, self.config.action_size),
+        axis=1
+      )
       self._target_variables = scope.trainable_variables()
-
-      targets *= tf.one_hot(self.action_predictions, self.config.action_size)
-      self.next_state_value = tf.reduce_sum(targets, axis=1)
-
-    self.update_target = [x.assign(y) for x, y in zip(self._target_variables, self._model_variables)]
 
     with tf.name_scope('Optimization'):
       self.global_step = tf.Variable(
@@ -199,6 +199,7 @@ class DoubleDQN(Sequential):
       )
       self.loss = self._loss()
       self.train_op = self._train_op()
+      self.update_target = [x.assign(y) for x, y in zip(self._target_variables, self._model_variables)]
 
     self.session = tf.Session()
     self.saver = tf.train.Saver(max_to_keep=10)
@@ -207,6 +208,14 @@ class DoubleDQN(Sequential):
     self.writer = tf.summary.FileWriter(config.logdir, self.session.graph)
     self.init = tf.global_variables_initializer()
     self.session.run(self.init)
+
+  def _train_op(self):
+    optimizer = self.config.optimizer(self.config.learning_rate)
+    return optimizer.minimize(
+      self.loss,
+      global_step=self.global_step,
+      var_list=self._model_variables
+    )
 
   def train(self, states, actions, rewards, next_states, mask_=None):
     train_result = super().train(states, actions, rewards, next_states, mask_)

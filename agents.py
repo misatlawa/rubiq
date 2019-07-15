@@ -6,7 +6,7 @@ import tensorflow as tf
 
 from configs import model_config, agent_config, environment_config
 from environment import RubiksCubeEnvironment
-from models import Sequential
+from models import DoubleDQN
 
 
 def sample_scramble(size=None):
@@ -34,7 +34,7 @@ class DQNAgent:
     self.config = config
     self.environment = RubiksCubeEnvironment(environment_config)
     self.exploration_rate = config.max_exploration_rate
-    self.model = Sequential(model_config)
+    self.model = DoubleDQN(model_config)
     self.memory = deque(maxlen=config.memory_size)
 
   def remember(self, state, action, reward, next_state):
@@ -68,7 +68,7 @@ class DQNAgent:
     return self.model.train(states, actions, rewards, next_states)
 
   def evaluation(self, n=None):
-    n = n or agent.model.config.weight_update_interval
+    n = n or agent.model.config.update_interval
     avg_length = Avg()
     avg_success = Avg()
     for _ in tqdm(range(n)):
@@ -84,7 +84,7 @@ if __name__ == "__main__":
   agent = DQNAgent(agent_config)
   avg_success = Avg()
 
-  for _ in range(100000):
+  for _ in range(1000000):
     l, s = agent.play_episode()
     train_result = agent.train_on_batch()
     if train_result:
@@ -92,7 +92,7 @@ if __name__ == "__main__":
         print(
           "step: {}, loss: {}".format(train_result.step, train_result and train_result.loss)
         )
-      if train_result.step % agent.model.config.weight_update_interval == 0:
+      if train_result.step % agent.model.config.update_interval == 0:
         avg_length, avg_success = agent.evaluation()
         summary = tf.Summary(value=[
           tf.Summary.Value(tag="success_rate", simple_value=avg_success.value),
