@@ -19,11 +19,11 @@ class Sequential:
 
       self.mask = self._mask()
 
-    with tf.name_scope('Model'):
+    with tf.variable_scope('Model'):
       self.q_predictions = self._q_predictions(self.states)
-      self.action_prediction = tf.argmax(self.q_predictions, axis=1)
+      self.action_predictions = tf.argmax(self.q_predictions, axis=1)
 
-      self.q_next_state = self._q_predictions(self.next_states)
+      self.q_next_state = self._q_predictions(self.next_states, reuse=True)
       self.next_state_value = tf.reduce_max(self.q_next_state)
 
     with tf.name_scope('Optimization'):
@@ -69,7 +69,7 @@ class Sequential:
     return tf.placeholder(
       shape=(None, self.config.state_size),
       dtype=self.config.dtype,
-      name='Next_states'
+      name='Next_States'
     )
 
   def _mask(self):
@@ -79,44 +79,35 @@ class Sequential:
       name='_mask'
     )
 
-  def _q_predictions(self, input_):
+  def _q_predictions(self, input_, reuse=tf.AUTO_REUSE):
     for i, output_size in enumerate(self.config.hidden_layers):
       input_ = tf.layers.dense(
         input_,
         units=output_size,
         activation=tf.nn.tanh,
         name='Layer{}'.format(i),
-        reuse=tf.AUTO_REUSE,
+        reuse=reuse,
       )
       tf.summary.histogram(input_.name, input_)
-    q_predictions = tf.layers.dense(
+
+    return tf.layers.dense(
       input_,
       units=12,
       activation=tf.nn.tanh,
       use_bias=False,
-      reuse=tf.AUTO_REUSE
+      reuse=reuse
     )
-    tf.summary.histogram('q_predictions', q_predictions)
-    return q_predictions
 
-  def act(self, state):
-    action = self.session.run(
-      fetches=(self.action_prediction),
-      feed_dict={self.states: [state]}
-    )
-    return action[0]
+  def _q_estimations(self):
+    return tf.add(self.rewards,  self.gamma * self.next_state_value, name='q_estimations')
 
   def _loss(self):
-    actions = tf.one_hot(
-      self.actions,
-      self.config.action_size
-    )
     q_predictions = tf.reduce_sum(
-      tf.math.multiply(actions, self.q_predictions),
-      axis=1,
-      name='q_predictions',
+      self.q_predictions * tf.one_hot(self.actions, self.config.action_size),
+      axis=1
     )
-    q_estimations = tf.add(self.rewards,  self.gamma * self.next_state_value, name='q_estimations')
+    q_estimations = self._q_estimations()
+
     error = tf.multiply((q_predictions - q_estimations), self.mask, name='error')
     loss = tf.reduce_mean(tf.square(error), name='MSE_loss')
 
@@ -148,6 +139,13 @@ class Sequential:
     self.writer.add_summary(summary, global_step=step)
     return AttrDict(locals())
 
+  def act(self, state):
+    action = self.session.run(
+      fetches=(self.action_predictions),
+      feed_dict={self.states: [state]}
+    )
+    return action[0]
+
   def save_weights(self, path_):
     self.saver.save(self.session, save_path=path_)
 
@@ -166,43 +164,55 @@ class Sequential:
 
 class DoubleDQN(Sequential):
   def __init__(self, config):
-    super().__init__(config)
-    cpu_config = tf.ConfigProto(
-        device_count={'GPU': 0}
-    )
-    self.cpu_session = tf.Session(config=cpu_config)
-    self.cpu_session.run(self.init)
+    self.config = config
+    self.gamma = config.gamma
 
-  def act(self, state):
-    action = self.cpu_session.run(
-      fetches=(self.action_prediction),
-      feed_dict={self.states: [state]}
-    )
-    return action[0]
+    with tf.name_scope('Batch'):
+      self.states = self._states()
+      self.actions = self._actions()
+      self.rewards = self._rewards()
+      self.next_states = self._next_states()
 
-  def update_weights(self):
-    trainable_variables = tf.trainable_variables()
-    variable_values = self.session.run(
-      trainable_variables
-    )
-    self.cpu_session.run(
-      [
-        variable.assign(value)
-        for variable, value in zip(trainable_variables, variable_values)
-      ]
-    )
+      self.mask = self._mask()
 
-  def train(self, states, actions, values):
-    loss, step, summary, _ = self.session.run(
-      fetches=(self.loss, self.global_step, self.summary, self.train_op),
-      feed_dict={
-        self.states: states,
-        self.actions: actions,
-        self.values: values
-      }
-    )
-    self.writer.add_summary(summary, global_step=step)
-    if not step % self.config.weight_update_interval:
-      self.update_weights()
+    with tf.variable_scope('Model') as scope:
+      self.q_predictions = self._q_predictions(self.states)
+      self._model_variables = scope.trainable_variables()
 
-    return AttrDict(locals())
+      self.action_predictions = tf.argmax(self.q_predictions, axis=1)
+      self.q_next_state = self._q_predictions(self.next_states, reuse=True)
+
+    with tf.variable_scope("Target") as scope:
+      targets = self._q_predictions(self.next_states, reuse=False)
+      self._target_variables = scope.trainable_variables()
+
+      targets *= tf.one_hot(self.action_predictions, self.config.action_size)
+      self.next_state_value = tf.reduce_sum(targets, axis=1)
+
+    self.update_target = [x.assign(y) for x, y in zip(self._target_variables, self._model_variables)]
+
+    with tf.name_scope('Optimization'):
+      self.global_step = tf.Variable(
+        initial_value=0,
+        dtype=tf.int64,
+        name="step"
+      )
+      self.loss = self._loss()
+      self.train_op = self._train_op()
+
+    self.session = tf.Session()
+    self.saver = tf.train.Saver(max_to_keep=10)
+
+    self.summary = tf.summary.merge_all()
+    self.writer = tf.summary.FileWriter(config.logdir, self.session.graph)
+    self.init = tf.global_variables_initializer()
+    self.session.run(self.init)
+
+  def train(self, states, actions, rewards, next_states, mask_=None):
+    train_result = super().train(states, actions, rewards, next_states, mask_)
+    if train_result.step % self.config.update_interval == 0:
+      self.session.run(
+        self.update_target
+      )
+
+    return train_result
