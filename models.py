@@ -73,6 +73,7 @@ class Sequential:
         num_outputs=output_size,
         activation_fn=tf.nn.tanh
       )
+      tf.summary.histogram(input_.name, input_)
     q_predictions = tf.layers.dense(
       input_,
       units=12,
