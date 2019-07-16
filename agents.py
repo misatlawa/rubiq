@@ -47,13 +47,13 @@ class DQNAgent:
       return np.random.choice(range(self.config.action_size))
     return self.model.act(state)
 
-  def play_episode(self, is_eval=False):
+  def play_episode(self, is_eval=False, difficulty=None):
     self.environment.reset()
-    self.environment.scramble(sample_scramble())
+    self.environment.scramble(difficulty or sample_scramble())
     state = self.environment.encoded_state()
 
     is_solved = False
-    counter = 0
+    counter = None
     for counter in range(self.max_steps):
       action = self.model.act(state) if is_eval else self.policy(state)
       reward, next_state, is_solved = self.environment(action)
@@ -86,16 +86,25 @@ class DQNAgent:
 
 if __name__ == "__main__":
   agent = DQNAgent(agent_config)
-  avg_success = Avg()
-
+  try:
+    agent.model.load_weights(model_config.logdir)
+  except FileNotFoundError:
+    pass
+  online_success = Avg()
   for _ in range(1000000):
     l, s = agent.play_episode()
+    online_success.update(s)
     train_result = agent.train_on_batch()
     if train_result:
       if train_result.step % 100 == 0:
         print(
-          "step: {}, loss: {}".format(train_result.step, train_result and train_result.loss)
+          "step: {}, loss: {}, success: {}".format(
+            train_result.step,
+            train_result and train_result.loss,
+            round(online_success.value, 4)
+          )
         )
+        online_success = Avg()
       if train_result.step % agent.model.config.update_interval == 0:
         avg_length, avg_success = agent.evaluation()
         summary = tf.Summary(value=[
