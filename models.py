@@ -126,16 +126,16 @@ class Sequential:
 
   def train(self, states, actions, rewards, next_states, mask_=None):
     mask_ = mask_ if mask_ is not None else np.ones_like(rewards)
-    feed_dict = {
+
+    loss, step, summary, _ = self.session.run(
+      fetches=(self.loss, self.global_step, self.summary, self.train_op),
+      feed_dict={
         self.states: states,
         self.actions: actions,
         self.rewards: rewards,
         self.next_states: next_states,
         self.mask: mask_
       }
-    loss, step, summary, _ = self.session.run(
-      fetches=(self.loss, self.global_step, self.summary, self.train_op),
-      feed_dict=feed_dict
     )
     self.writer.add_summary(summary, global_step=step)
     return AttrDict(locals())
@@ -223,5 +223,4 @@ class DoubleDQN(Sequential):
       self.session.run(
         self.update_target
       )
-
     return train_result

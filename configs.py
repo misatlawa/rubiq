@@ -37,8 +37,8 @@ environment_config = AttrDict(
     "state_size": STATE_SIZE,
     "allowed_moves": ALLOWED_MOVES,
     "step_reward": -0.1,
-    "success_reward": 1,
-    "fail_reward": -1,
+    "success_reward": 1.,
+    "fail_reward": 0.,
     "max_steps": 50,
   }
 )
