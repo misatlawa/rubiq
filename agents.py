@@ -8,7 +8,6 @@ from configs import model_config, agent_config, environment_config
 from environment import RubiksCubeEnvironment
 from models import DoubleDQN
 
-
 def sample_scramble(size=None):
   return np.random.randint(low=1, high=30, size=size)
 
@@ -22,7 +21,7 @@ class Avg:
     if value is not None:
       if self.value is None:
         self.value = 0
-      self.value = (self.value * self.n + value) / (self.n + 1 )
+      self.value = (self.value * self.n + value) / (self.n + 1)
       self.n = self.n + 1
 
   def __str__(self):
@@ -35,6 +34,10 @@ class DQNAgent:
     self.environment = RubiksCubeEnvironment(environment_config)
     self.exploration_rate = config.max_exploration_rate
     self.model = DoubleDQN(model_config)
+    self.environments = [
+      RubiksCubeEnvironment(environment_config)
+      for _ in tqdm(range(100))
+    ]
     self.memory = deque(maxlen=config.memory_size)
 
   def remember(self, state, action, reward, next_state):
@@ -49,15 +52,42 @@ class DQNAgent:
     self.environment = RubiksCubeEnvironment(environment_config)
     self.environment.scramble(sample_scramble())
     state = self.environment.encoded_state()
-    is_terminal = False
     counter = 0
-    while not is_terminal:
-      action = self.model.act(state) if is_eval else self.policy(state)
+    for counter in range(self.environment.max_steps):
+      action = self.model.act_one(state) if is_eval else self.policy(state)
       reward, next_state, is_terminal = self.environment(action)
       self.remember(state, action, reward, next_state)
-      counter += 1
       state = next_state
-    return counter, reward > self.environment.config.fail_reward
+      if is_terminal:
+        return counter, True
+    return counter, False
+
+  def play_episodes(self, n=None):
+    n = n or len(self.environments)
+    for env, diff in zip(self.environments[:n], sample_scramble(n)):
+      env.reset()
+      env.scramble(diff)
+
+    states = [env.encoded_state() for env in self.environments]
+    results = np.zeros(shape=(n, self.environment.max_steps))
+    for step in range(self.environment.max_steps):
+      actions = self.model.act(states)
+      random_mask = np.random.binomial(n=1, p=self.exploration_rate, size=actions.shape)
+      random_actions = np.random.choice(range(self.config.action_size), size=actions.shape)
+      actions = random_mask * actions + (np.ones_like(random_mask) - random_mask) * random_actions
+      responses = [self.environment(action) for action in actions]
+
+      for i, (state, action, response) in enumerate(zip(states, actions, responses)):
+        reward, next_state, is_terminal = response
+        if not np.any(results[i, :]):
+          self.remember(state, action, reward, next_state)
+          results[i, step:] = is_terminal
+
+      rewards, next_states, are_terminal = zip(*responses)
+      states = next_states
+
+    successful = np.max(results, axis=1)
+    return np.average(successful)
 
   def train_on_batch(self):
     if len(self.memory) < self.model.config.batch_size:
@@ -85,14 +115,17 @@ if __name__ == "__main__":
   avg_success = Avg()
 
   for _ in range(1000000):
-    l, s = agent.play_episode()
+    success_rate = agent.play_episodes(100)
     train_result = agent.train_on_batch()
     if train_result:
-      if train_result.step % 100 == 0:
+      if train_result.step % 1 == 0:
         print(
-          "step: {}, loss: {}".format(train_result.step, train_result and train_result.loss)
+          "step: {}, loss: {}, success rate:{}".format(
+            train_result.step,
+            train_result and train_result.loss,
+            success_rate)
         )
-      if train_result.step % agent.model.config.update_interval == 0:
+      if train_result.step %agent.model.config.update_interval == 0:
         avg_length, avg_success = agent.evaluation()
         summary = tf.Summary(value=[
           tf.Summary.Value(tag="success_rate", simple_value=avg_success.value),

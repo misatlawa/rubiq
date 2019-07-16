@@ -1,10 +1,10 @@
-import numpy as np
 from cube.cube import Cube
 
 class RubiksCubeEnvironment:
 
   def __init__(self, config):
     self.config = config
+    self.max_steps = config.max_steps
     self.cube = Cube()
     self.counter = 0
 
@@ -17,6 +17,9 @@ class RubiksCubeEnvironment:
   def scramble(self, difficulty=26):
     self.cube.shuffle(moves=difficulty)
 
+  def reset(self):
+    self.cube.reset()
+
   def __call__(self, action_id=None):
     if action_id is not None:
       self.cube.move(self.config.allowed_moves[action_id])
@@ -28,6 +31,5 @@ class RubiksCubeEnvironment:
       reward = self.config.step_reward
     else:
       reward = self.config.fail_reward
-      is_terminal = True
     self.counter += 1
     return reward, self.encoded_state(), is_terminal

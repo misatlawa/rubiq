@@ -126,7 +126,6 @@ class Sequential:
 
   def train(self, states, actions, rewards, next_states, mask_=None):
     mask_ = mask_ if mask_ is not None else np.ones_like(rewards)
-
     loss, step, summary, _ = self.session.run(
       fetches=(self.loss, self.global_step, self.summary, self.train_op),
       feed_dict={
@@ -140,12 +139,15 @@ class Sequential:
     self.writer.add_summary(summary, global_step=step)
     return AttrDict(locals())
 
-  def act(self, state):
-    action = self.session.run(
+  def act_one(self, state):
+    return self.act([state])[0]
+
+  def act(self, states):
+    actions = self.session.run(
       fetches=(self.action_predictions),
-      feed_dict={self.states: [state]}
+      feed_dict={self.states: states}
     )
-    return action[0]
+    return actions
 
   def save_weights(self, path_):
     self.saver.save(self.session, save_path=path_)
