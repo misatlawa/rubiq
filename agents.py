@@ -61,7 +61,7 @@ class DQNAgent:
       state = next_state
       if is_solved:
         break
-    return counter, is_solved
+    return counter + 1, is_solved
 
   def train_on_batch(self):
     if len(self.memory) < self.model.config.batch_size:
@@ -86,10 +86,7 @@ class DQNAgent:
 
 if __name__ == "__main__":
   agent = DQNAgent(agent_config)
-  try:
-    agent.model.load_weights(model_config.logdir)
-  except FileNotFoundError:
-    pass
+  agent.model.load_weights(model_config.logdir)
   online_success = Avg()
   for _ in range(1000000):
     l, s = agent.play_episode()

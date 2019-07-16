@@ -152,16 +152,10 @@ class Sequential:
 
   def load_weights(self, path_):
     if path.isdir:
-      self.saver.recover_last_checkpoints(checkpoint_paths=path_)
-    elif path.isfile:
+      path_ = tf.train.latest_checkpoint(path_)
+    if path_:
       self.saver.restore(self.session, save_path=path_)
-    else:
-      raise FileNotFoundError(
-        errno.ENOENT,
-        strerror(errno.ENOENT),
-        path_
-      )
-
+      print("restored weights from {}".format(path))
 
 class DoubleDQN(Sequential):
   def __init__(self, config):
