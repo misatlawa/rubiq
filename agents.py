@@ -32,10 +32,12 @@ class Avg:
 class DQNAgent:
   def __init__(self, config):
     self.config = config
-    self.environment = RubiksCubeEnvironment(environment_config)
+    self.max_steps = config.max_steps
     self.exploration_rate = config.max_exploration_rate
-    self.model = DoubleDQN(model_config)
     self.memory = deque(maxlen=config.memory_size)
+
+    self.environment = RubiksCubeEnvironment(environment_config)
+    self.model = DoubleDQN(model_config)
 
   def remember(self, state, action, reward, next_state):
     self.memory.append((state, action, reward, next_state))
@@ -46,18 +48,20 @@ class DQNAgent:
     return self.model.act(state)
 
   def play_episode(self, is_eval=False):
-    self.environment = RubiksCubeEnvironment(environment_config)
+    self.environment.reset()
     self.environment.scramble(sample_scramble())
     state = self.environment.encoded_state()
-    is_terminal = False
+
+    is_solved = False
     counter = 0
-    while not is_terminal:
+    for counter in range(self.max_steps):
       action = self.model.act(state) if is_eval else self.policy(state)
-      reward, next_state, is_terminal = self.environment(action)
+      reward, next_state, is_solved = self.environment(action)
       self.remember(state, action, reward, next_state)
-      counter += 1
       state = next_state
-    return counter, reward > self.environment.config.fail_reward
+      if is_solved:
+        break
+    return counter, is_solved
 
   def train_on_batch(self):
     if len(self.memory) < self.model.config.batch_size:
