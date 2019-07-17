@@ -123,7 +123,8 @@ class Sequential:
     return tf.add(
       self.input.rewards,
       (1 - self.input.is_terminal) * self.gamma * self.nn.next_state_value,
-      name='q_estimations')
+      name='q_estimations'
+    )
 
   def _loss(self):
     q_predictions = tf.reduce_sum(
@@ -136,6 +137,7 @@ class Sequential:
     loss = tf.reduce_mean(tf.square(error), name='MSE_loss')
 
     tf.summary.scalar('loss', loss)
+    tf.summary.scalar('q_avg', tf.reduce_mean(q_predictions))
     tf.summary.histogram('q_prediction', q_predictions)
     tf.summary.histogram('q_estimation', q_estimations)
 
