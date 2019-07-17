@@ -31,20 +31,22 @@ class Avg:
 
 class DQNAgent:
   def __init__(self, config):
-    self.memory = deque(maxlen=config.memory_size)
+    self.environment = RubiksCubeEnvironment(environment_config)
+    self.model = DoubleDQN(model_config)
+
     self.state_size = config.state_size
     self.action_size = config.action_size
     self.memory_size = config.memory_size
     self.batch_size = config.batch_size
 
+    self.memory = deque(maxlen=config.memory_size)
+    self.short_memory = deque(maxlen=self.batch_size)
+
     self.exploration_rate = config.max_exploration_rate
     self.min_exploration_rate = config.min_exploration_rate
 
-    self.environment = RubiksCubeEnvironment(environment_config)
-    self.model = DoubleDQN(model_config)
-
   def remember(self, state, action, reward, next_state):
-    self.memory.append((state, action, reward, next_state))
+    self.short_memory.append((state, action, reward, next_state))
 
   def policy(self, state):
     if np.random.rand() < self.exploration_rate:
@@ -65,12 +67,21 @@ class DQNAgent:
       state = next_state
     return counter, reward == self.environment.success_reward
 
-  def train_on_batch(self, batch=None):
-    if len(self.memory) < self.batch_size:
-      return
-    batch = batch or sample(self.memory, self.batch_size)
-    states, actions, rewards, next_states = map(np.array, zip(*batch))
+  def train_on_batch(self, replay=True):
+    if replay:
+      if len(self.memory) < self.batch_size:
+        return
+      batch = sample(self.memory, self.batch_size)
 
+    elif len(self.short_memory):
+      batch = np.array(self.short_memory)
+      self.memory.extend(self.short_memory)
+      self.short_memory.clear()
+
+    else:
+      return
+
+    states, actions, rewards, next_states = map(np.array, zip(*batch))
     return self.model.train(states, actions, rewards, next_states)
 
   def evaluation(self, n=None):
@@ -89,15 +100,21 @@ class DQNAgent:
 if __name__ == "__main__":
   agent = DQNAgent(agent_config)
   agent.model.load_weights(agent.model.logdir)
-  avg_success = Avg()
 
   for _ in range(1000000):
+    avg_success = Avg()
+    avg_len = Avg()
     l, s = agent.play_episode()
-    train_result = agent.train_on_batch()
+    avg_success.update(s)
+    avg_len.update(l)
+    train_result = agent.train_on_batch(replay=False)
     if train_result:
       if train_result.step % 100 == 0:
         print(
-          "step: {}, loss: {}".format(train_result.step, train_result and train_result.loss)
+          "step: {}, loss: {}, s: {}".format(
+            train_result.step,
+            train_result and train_result.loss,
+            avg_success.value)
         )
       if train_result.step % agent.model.update_interval == 0:
         avg_length, avg_success = agent.evaluation()
