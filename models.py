@@ -66,14 +66,21 @@ class Sequential:
     return tf.placeholder(
       shape=(None, self.state_size),
       dtype=self.dtype,
-      name='Next_States'
+      name='NextStates'
+    )
+
+  def _is_terminal(self):
+    return tf.placeholder(
+      shape=(None, ),
+      dtype=self.dtype,
+      name='IsTerminal'
     )
 
   def _mask(self):
     return tf.placeholder(
       shape=(None,),
       dtype=self.dtype,
-      name='_mask'
+      name='Mask'
     )
 
   def _get_input(self):
@@ -81,6 +88,7 @@ class Sequential:
     actions = self._actions()
     rewards = self._rewards()
     next_states = self._next_states()
+    is_terminal = self._is_terminal()
     mask = self._mask()
     return AttrDict(locals())
 
@@ -112,7 +120,10 @@ class Sequential:
     )
 
   def _q_estimations(self):
-    return tf.add(self.input.rewards,  self.gamma * self.nn.next_state_value, name='q_estimations')
+    return tf.add(
+      self.input.rewards,
+      (1 - self.input.is_terminal) * self.gamma * self.nn.next_state_value,
+      name='q_estimations')
 
   def _loss(self):
     q_predictions = tf.reduce_sum(
@@ -137,7 +148,7 @@ class Sequential:
       global_step=self.global_step
     )
 
-  def train(self, states, actions, rewards, next_states, mask_=None):
+  def train(self, states, actions, rewards, next_states, is_terminal, mask_=None):
     mask_ = mask_ if mask_ is not None else np.ones_like(rewards)
 
     loss, step, summary, _ = self.session.run(
@@ -147,6 +158,7 @@ class Sequential:
         self.input.actions: actions,
         self.input.rewards: rewards,
         self.input.next_states: next_states,
+        self.input.is_terminal: is_terminal,
         self.input.mask: mask_
       }
     )
@@ -206,8 +218,8 @@ class DoubleDQN(Sequential):
       var_list=self.nn.model_variables
     )
 
-  def train(self, states, actions, rewards, next_states, mask_=None):
-    train_result = super().train(states, actions, rewards, next_states, mask_)
+  def train(self, states, actions, rewards, next_states, is_terminal, mask_=None):
+    train_result = super().train(states, actions, rewards, next_states, is_terminal, mask_)
     if train_result.step % self.update_interval == 0:
       self.session.run(
         self._update_target

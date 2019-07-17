@@ -43,8 +43,8 @@ class DQNAgent:
     self.environment = RubiksCubeEnvironment(environment_config)
     self.model = DoubleDQN(model_config)
 
-  def remember(self, state, action, reward, next_state):
-    self.memory.append((state, action, reward, next_state))
+  def remember(self, *args):
+    self.memory.append(args)
 
   def policy(self, state):
     if np.random.rand() < self.exploration_rate:
@@ -60,7 +60,7 @@ class DQNAgent:
     while not is_terminal:
       action = self.model.act(state) if is_eval else self.policy(state)
       reward, next_state, is_terminal = self.environment(action)
-      self.remember(state, action, reward, next_state)
+      self.remember(state, action, reward, next_state, is_terminal)
       counter += 1
       state = next_state
     return counter, reward == self.environment.success_reward
@@ -69,9 +69,9 @@ class DQNAgent:
     if len(self.memory) < self.batch_size:
       return
     batch = batch or sample(self.memory, self.batch_size)
-    states, actions, rewards, next_states = map(np.array, zip(*batch))
+    states, actions, rewards, next_states, is_terminal = map(np.array, zip(*batch))
 
-    return self.model.train(states, actions, rewards, next_states)
+    return self.model.train(states, actions, rewards, next_states, is_terminal)
 
   def evaluation(self, n=None):
     n = n or agent.model.update_interval
