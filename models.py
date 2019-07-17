@@ -150,17 +150,13 @@ class Sequential:
   def save_weights(self, path_):
     self.saver.save(self.session, save_path=path_)
 
-  def load_weights(self, path_):
+  def load_weights(self, path_=None):
+    path_ = path_ or self.config.logdir
     if path.isdir:
-      self.saver.recover_last_checkpoints(checkpoint_paths=path_)
-    elif path.isfile:
+      path_ = self.saver.recover_last_checkpoints(checkpoint_paths=path_)
+    if path_:
       self.saver.restore(self.session, save_path=path_)
-    else:
-      raise FileNotFoundError(
-        errno.ENOENT,
-        strerror(errno.ENOENT),
-        path_
-      )
+      print("Loaded model weights from {}".format(path_))
 
 
 class DoubleDQN(Sequential):

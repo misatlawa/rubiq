@@ -82,6 +82,7 @@ class DQNAgent:
 
 if __name__ == "__main__":
   agent = DQNAgent(agent_config)
+  agent.model.load_weights(agent.model.config.logdir)
   avg_success = Avg()
 
   for _ in range(1000000):
