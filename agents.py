@@ -5,7 +5,7 @@ from tqdm import tqdm
 import tensorflow as tf
 
 from configs import model_config, agent_config, environment_config
-from environment import RubiksCubeEnvironment
+from environment import RandomStoppingEnvironment
 from models import DoubleDQN
 
 
@@ -40,7 +40,7 @@ class DQNAgent:
     self.exploration_rate = config.max_exploration_rate
     self.min_exploration_rate = config.min_exploration_rate
 
-    self.environment = RubiksCubeEnvironment(environment_config)
+    self.environment = RandomStoppingEnvironment(environment_config)
     self.model = DoubleDQN(model_config)
 
   def remember(self, *args):
@@ -52,7 +52,7 @@ class DQNAgent:
     return self.model.act(state)
 
   def play_episode(self, is_eval=False):
-    self.environment = RubiksCubeEnvironment(environment_config)
+    self.environment.reset()
     self.environment.scramble(sample_scramble())
     state = self.environment.encoded_state()
     is_terminal = False
