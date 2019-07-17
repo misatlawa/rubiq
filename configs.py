@@ -13,11 +13,11 @@ model_config = AttrDict(
     "action_size": len(ALLOWED_MOVES),
     "hidden_layers_size": [STATE_SIZE, STATE_SIZE, STATE_SIZE, 200],
     "dtype": tf.float32,
-    "optimizer": tf.train.AdamOptimizer,
+    "optimizer": tf.train.RMSPropOptimizer,
     "learning_rate": 1e-4,
     "update_interval": 500,
-    "gamma": 0.9,
-    "logdir": "logdir/DoubleDQN"
+    "gamma": 0.8,
+    "logdir": "logdir/DoubleDQN-RMS"
   }
 )
 
@@ -36,9 +36,9 @@ environment_config = AttrDict(
   {
     "state_size": STATE_SIZE,
     "allowed_moves": ALLOWED_MOVES,
-    "step_reward": -0.1,
+    "step_reward": 0.,
     "success_reward": 1.,
-    "fail_reward": 0.,
+    "fail_reward": -1.,
     "max_steps": 20,
   }
 )
