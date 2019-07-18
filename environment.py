@@ -3,6 +3,7 @@ from cube.cube import Cube
 from cube.tensorcube import TensorCube
 from cube.movegen import get_zero_cube
 
+
 class RubiksCubeEnvironment:
 
   def __init__(self, config):
@@ -32,16 +33,16 @@ class RubiksCubeEnvironment:
   def __call__(self, action_id=None):
     if action_id is not None:
       self.cube.move(self.allowed_moves[action_id])
+      self.counter += 1
 
     is_terminal = self.is_solved()
-    if self.counter < self.max_steps and is_terminal:
+    if self.counter <= self.max_steps and is_terminal:
       reward = self.success_reward
-    elif self.counter < self.max_steps:
+    elif self.counter <= self.max_steps:
       reward = self.step_reward
     else:
       reward = self.fail_reward
       is_terminal = True
-    self.counter += 1
     return reward, self.encoded_state(), is_terminal
 
 
