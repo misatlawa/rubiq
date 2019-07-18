@@ -27,6 +27,7 @@ class RubiksCubeEnvironment:
 
   def reset(self):
     self.cube.reset()
+    self.counter = 0
 
   def __call__(self, action_id=None):
     if action_id is not None:
