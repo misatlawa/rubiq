@@ -3,11 +3,10 @@ import numpy as np
 
 
 def movegen():
-
   csvs = ['RO', 'GB', 'YW', 'OTurn']
 
   basic_movements = [
-    np.genfromtxt('matrices/{}.csv'.format(x), delimiter=',', dtype=int) for x in csvs
+    np.genfromtxt('cube/matrices/{}.csv'.format(x), delimiter=',', dtype=int) for x in csvs
   ]
 
   basic_movements_inv = [np.linalg.inv(x).astype(int) for x in basic_movements]
@@ -35,4 +34,4 @@ def movegen():
 
 
 def get_zero_cube():
-  return np.genfromtxt('matrices/ZEROCUBE.csv', delimiter=',', dtype=int)
+  return np.genfromtxt('cube/matrices/ZEROCUBE.csv', delimiter=',', dtype=int)

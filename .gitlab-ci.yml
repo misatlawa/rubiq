@@ -1,0 +1,11 @@
+stages:
+  - test
+tests:
+  image: "python:3.7"
+  stage: test
+  script:
+    - pip install --upgrade pip
+    - pip install pipenv
+    - pipenv install --dev
+    - pipenv run coverage run -m unittest --verbose
+    - pipenv run coverage report --omit='*/site-packages/*'

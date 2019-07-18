@@ -3,11 +3,10 @@ from .movegen import movegen, get_zero_cube
 from random import choice
 
 class Cube:
-
   def __init__(self):
     self.zerocube = get_zero_cube()
-    self.state = self.zerocube
     self.movements = movegen()
+    self.state = self.zerocube
 
   @classmethod
   def reverse_sequence(cls, sequence):

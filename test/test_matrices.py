@@ -2,9 +2,7 @@ import unittest
 from itertools import permutations, chain
 from .base import *
 
-
 class AxialMatrixTest(unittest.TestCase):
-
   def matrix_test(self, matrix, cc=zc, turns=4):
     for i in range(1, turns + 1):
       cc = np.matmul(matrix, cc)

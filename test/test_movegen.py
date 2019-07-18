@@ -1,13 +1,11 @@
 import unittest
 from cube.movegen import movegen
-
 from .base import *
 
 moves = movegen()
 
 
 class MovegenTest(unittest.TestCase):
-
   def cycle_test(self, move, cc=zc, turns=4):
     for i in range(1, turns + 1):
       cc = np.matmul(move, cc)
