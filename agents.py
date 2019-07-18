@@ -1,11 +1,12 @@
 from collections import deque
+from attrdict import AttrDict
 import numpy as np
 from random import sample
 from tqdm import tqdm
 import tensorflow as tf
 
 from configs import model_config, agent_config, environment_config
-from environment import RandomStoppingEnvironment
+from environment import TensorEnvironment, RubiksCubeEnvironment
 from models import DoubleDQN
 
 
@@ -40,7 +41,8 @@ class DQNAgent:
     self.exploration_rate = config.max_exploration_rate
     self.min_exploration_rate = config.min_exploration_rate
 
-    self.environment = RandomStoppingEnvironment(environment_config)
+    self.evaluation_environment = RubiksCubeEnvironment(environment_config)
+    self.training_environment = TensorEnvironment(environment_config, n=self.batch_size)
     self.model = DoubleDQN(model_config)
 
   def remember(self, *args):
@@ -51,21 +53,52 @@ class DQNAgent:
       return np.random.choice(range(self.action_size))
     return self.model.act(state)
 
-  def play_episode(self, is_eval=False, n=1):
-    self.environment.reset()
-    self.environment.scramble(sample_scramble())
-    state = self.environment.encoded_state()
+  def play_episode(self):
+    self.evaluation_environment.reset()
+    self.evaluation_environment.scramble(sample_scramble())
+    state = self.evaluation_environment.encoded_state()
     is_terminal = False
     counter = 0
     while not is_terminal:
-      action = self.model.act(state) if is_eval else self.policy(state)
-      reward, next_state, is_terminal = self.environment(action)
+      action = self.model.act(state)
+      reward, next_state, is_terminal = self.evaluation_environment(action)
       self.remember(state, action, reward, next_state, is_terminal)
       counter += 1
       state = next_state
-    return counter, reward == self.environment.success_reward
+    return counter, reward == self.evaluation_environment.success_reward
 
-  def train_on_batch(self, batch=None):
+  def train_online(self, difficulty=30):
+    self.training_environment.reset()
+    self.training_environment.scramble(difficulty)
+    states = self.training_environment.state
+
+    active = np.ones(shape=self.batch_size)
+    success = Avg()
+    lengths = Avg()
+    for i in range(1, 30):
+      random_mask = np.random.binomial(1, p=self.exploration_rate, size=self.batch_size)
+      actions = random_mask * self.model.act(states) + (1 - random_mask) * np.random.choice(range(self.action_size))
+      response = self.training_environment(actions)
+      rewards, next_states, terminal = response
+
+      self.model.train(states, actions, *response, mask_=active)
+      for state, action, reward, next_state, is_terminal, is_active in zip(states, actions, *response, active):
+        if is_active:
+          self.remember(state, action, reward, next_state, is_terminal)
+          if is_terminal:
+            if reward == self.training_environment.success_reward:
+              success.update(1)
+              lengths.update(i)
+            else:
+              success.update(0)
+
+      active *= np.logical_not(terminal)
+      if not np.any(terminal):
+        break
+
+    return success.value, lengths.value
+
+  def train_on_memory(self, batch=None):
     if len(self.memory) < self.batch_size:
       return
     batch = batch or sample(self.memory, self.batch_size)
@@ -74,11 +107,11 @@ class DQNAgent:
     return self.model.train(states, actions, rewards, next_states, is_terminal)
 
   def evaluation(self, n=None):
-    n = n or agent.model.update_interval
+    n = n or self.model.update_interval
     avg_length = Avg()
     avg_success = Avg()
     for _ in tqdm(range(n)):
-      l, s = agent.play_episode(is_eval=True)
+      l, s = self.play_episode()
       avg_success.update(s)
       if s and l:
         avg_length.update(l)
@@ -91,27 +124,34 @@ if __name__ == '__main__':
   agent.model.load_weights(agent.model.logdir)
   avg_success = Avg()
 
-  for _ in range(1000000):
-    l, s = agent.play_episode()
-    train_result = agent.train_on_batch()
+  for step in range(1000000):
+    step += 1
+    difficulty = sample_scramble()
+    success, length = agent.train_online(difficulty)
+    train_result = agent.train_on_memory()
     if train_result:
-      if train_result.step % 100 == 0:
-        print(
-          'step: {}, loss: {}'.format(train_result.step, train_result and train_result.loss)
-        )
-      if train_result.step % agent.model.update_interval == 0:
+      print(
+        'step: {} ({}), loss: {}, acc: {} ({})'.format(train_result.step, step, train_result.loss, success, difficulty)
+      )
+      if difficulty < 10:
+        summary = tf.Summary(value=[
+          tf.Summary.Value(tag='n_success_rate/{}_success_rate'.format(difficulty), simple_value=success),
+          tf.Summary.Value(tag='n_solution_length/{}_solution_length'.format(difficulty), simple_value=length),
+        ])
+        agent.model.writer.add_summary(summary, global_step=train_result.step)
+      if step % 10 == 0:
         avg_length, avg_success = agent.evaluation()
         summary = tf.Summary(value=[
           tf.Summary.Value(tag='success_rate', simple_value=avg_success.value),
-          tf.Summary.Value(tag='avg_length', simple_value=avg_length.value),
+          tf.Summary.Value(tag='solution_length', simple_value=avg_length.value),
           tf.Summary.Value(tag='exploration_rate', simple_value=agent.exploration_rate),
         ])
         agent.model.writer.add_summary(summary, global_step=train_result.step)
         agent.model.writer.flush()
         agent.exploration_rate = max(agent.min_exploration_rate, agent.exploration_rate * 0.9)
 
-      if train_result.step % 3000 == 0:
-        agent.model.save_weights('{}/s{}_{}'.format(
+      if step % 1000 == 0:
+        agent.model.save_weights('/e{}_s{}_{}'.format(
           agent.model.logdir,
           train_result.step,
           round(avg_success.value), 3)

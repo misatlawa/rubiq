@@ -105,18 +105,24 @@ class Sequential:
       input_ = tf.layers.dense(
         input_,
         units=output_size,
-        activation=tf.nn.tanh,
+        activation=tf.nn.relu,
         name='Layer{}'.format(i),
         reuse=reuse,
       )
       tf.summary.histogram(input_.name, input_)
 
-    return tf.layers.dense(
+    q_bias = tf.Variable(
+      initial_value=0,
+      name='common_bias',
+      dtype=self.dtype
+    )
+    tf.summary.scalar('q_bias', q_bias)
+    return q_bias + tf.layers.dense(
       input_,
       units=12,
       activation=tf.nn.tanh,
       use_bias=False,
-      reuse=reuse
+      reuse=reuse,
     )
 
   def _q_estimations(self):
@@ -128,8 +134,8 @@ class Sequential:
 
   def _loss(self):
     q_predictions = tf.reduce_sum(
-      self.nn.q_predictions * tf.one_hot(self.input.actions, self.action_size),
-      axis=1
+      self.nn.q_predictions * tf.one_hot(self.input.actions, self.action_size, dtype=self.dtype),
+      axis=1,
     )
     q_estimations = self._q_estimations()
 
@@ -168,9 +174,12 @@ class Sequential:
     return AttrDict(locals())
 
   def act(self, state):
+    state = np.array(state)
+    if len(state.shape) < 2:
+      state = np.expand_dims(state, axis=0)
     action = self.session.run(
       fetches=(self.nn.action_predictions),
-      feed_dict={self.input.states: [state]}
+      feed_dict={self.input.states: state}
     )
     return action[0]
 
@@ -205,7 +214,7 @@ class DoubleDQN(Sequential):
     with tf.variable_scope('Target') as scope:
       targets = self._q_predictions(self.input.next_states, reuse=False)
       next_state_value = tf.reduce_sum(
-        targets * tf.one_hot(action_predictions, self.action_size),
+        targets * tf.one_hot(action_predictions, self.action_size, dtype=self.dtype),
         axis=1
       )
       target_variables = scope.trainable_variables()
