@@ -28,7 +28,7 @@ class Sequential:
       self.global_step = tf.Variable(
         initial_value=0,
         dtype=tf.int64,
-        name="step"
+        name='step'
       )
       self.loss = self._loss()
       self.train_op = self._train_op()
@@ -183,7 +183,7 @@ class Sequential:
       path_ = tf.train.latest_checkpoint(path_)
     if path_:
       self.saver.restore(self.session, save_path=path_)
-      print("Loaded model weights from {}".format(path_))
+      print('Loaded model weights from {}'.format(path_))
 
 
 class DoubleDQN(Sequential):
@@ -202,7 +202,7 @@ class DoubleDQN(Sequential):
       q_next_state = self._q_predictions(self.input.next_states, reuse=True)
       model_variables = scope.trainable_variables()
 
-    with tf.variable_scope("Target") as scope:
+    with tf.variable_scope('Target') as scope:
       targets = self._q_predictions(self.input.next_states, reuse=False)
       next_state_value = tf.reduce_sum(
         targets * tf.one_hot(action_predictions, self.action_size),

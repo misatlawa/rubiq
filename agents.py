@@ -51,7 +51,7 @@ class DQNAgent:
       return np.random.choice(range(self.action_size))
     return self.model.act(state)
 
-  def play_episode(self, is_eval=False):
+  def play_episode(self, is_eval=False, n=1):
     self.environment.reset()
     self.environment.scramble(sample_scramble())
     state = self.environment.encoded_state()
@@ -86,7 +86,7 @@ class DQNAgent:
     return avg_length, avg_success
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   agent = DQNAgent(agent_config)
   agent.model.load_weights(agent.model.logdir)
   avg_success = Avg()
@@ -97,14 +97,14 @@ if __name__ == "__main__":
     if train_result:
       if train_result.step % 100 == 0:
         print(
-          "step: {}, loss: {}".format(train_result.step, train_result and train_result.loss)
+          'step: {}, loss: {}'.format(train_result.step, train_result and train_result.loss)
         )
       if train_result.step % agent.model.update_interval == 0:
         avg_length, avg_success = agent.evaluation()
         summary = tf.Summary(value=[
-          tf.Summary.Value(tag="success_rate", simple_value=avg_success.value),
-          tf.Summary.Value(tag="avg_length", simple_value=avg_length.value),
-          tf.Summary.Value(tag="exploration_rate", simple_value=agent.exploration_rate),
+          tf.Summary.Value(tag='success_rate', simple_value=avg_success.value),
+          tf.Summary.Value(tag='avg_length', simple_value=avg_length.value),
+          tf.Summary.Value(tag='exploration_rate', simple_value=agent.exploration_rate),
         ])
         agent.model.writer.add_summary(summary, global_step=train_result.step)
         agent.model.writer.flush()
