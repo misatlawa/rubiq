@@ -1,5 +1,4 @@
 from collections import deque
-from attrdict import AttrDict
 import numpy as np
 from random import sample
 from tqdm import tqdm
@@ -11,7 +10,7 @@ from models import DoubleDQN
 
 
 def sample_scramble(size=None):
-  return np.random.randint(low=1, high=30, size=size)
+  return np.random.randint(low=1, high=20, size=size)
 
 
 class Avg:
@@ -53,9 +52,11 @@ class DQNAgent:
       return np.random.choice(range(self.action_size))
     return self.model.act(state)
 
-  def play_episode(self):
+  def play_episode(self, difficulty=None):
+    difficulty = difficulty or sample_scramble()
     self.evaluation_environment.reset()
-    self.evaluation_environment.scramble(sample_scramble())
+    self.evaluation_environment.scramble(difficulty)
+
     state = self.evaluation_environment.encoded_state()
     is_terminal = False
     counter = 0
@@ -65,7 +66,7 @@ class DQNAgent:
       self.remember(state, action, reward, next_state, is_terminal)
       counter += 1
       state = next_state
-    return counter, reward == self.evaluation_environment.success_reward
+    return reward == self.evaluation_environment.success_reward, counter
 
   def train_online(self, difficulty=30):
     self.training_environment.reset()
@@ -111,12 +112,12 @@ class DQNAgent:
     avg_length = Avg()
     avg_success = Avg()
     for _ in tqdm(range(n)):
-      l, s = self.play_episode()
+      s, l = self.play_episode()
       avg_success.update(s)
       if s and l:
         avg_length.update(l)
 
-    return avg_length, avg_success
+    return avg_success, avg_length
 
 
 if __name__ == '__main__':
@@ -125,9 +126,17 @@ if __name__ == '__main__':
   avg_success = Avg()
 
   for step in range(1000000):
-    step += 1
     difficulty = sample_scramble()
-    success, length = agent.train_online(difficulty)
+    success = Avg()
+    length = Avg()
+
+    for _ in range(10):
+      s, l = agent.play_episode(difficulty)
+      success.update(s)
+      if s:
+        length.update(l)
+
+    #success, length = agent.train_online(difficulty)
     train_result = agent.train_on_memory()
     if train_result:
       print(
@@ -135,12 +144,12 @@ if __name__ == '__main__':
       )
       if difficulty < 10:
         summary = tf.Summary(value=[
-          tf.Summary.Value(tag='n_success_rate/{}_success_rate'.format(difficulty), simple_value=success),
-          tf.Summary.Value(tag='n_solution_length/{}_solution_length'.format(difficulty), simple_value=length),
+          tf.Summary.Value(tag='n_success_rate/{}_success_rate'.format(difficulty), simple_value=success.value),
+          tf.Summary.Value(tag='n_solution_length/{}_solution_length'.format(difficulty), simple_value=length.value),
         ])
         agent.model.writer.add_summary(summary, global_step=train_result.step)
       if step % 10 == 0:
-        avg_length, avg_success = agent.evaluation()
+        avg_success, avg_length = agent.evaluation()
         summary = tf.Summary(value=[
           tf.Summary.Value(tag='success_rate', simple_value=avg_success.value),
           tf.Summary.Value(tag='solution_length', simple_value=avg_length.value),
@@ -151,8 +160,9 @@ if __name__ == '__main__':
         agent.exploration_rate = max(agent.min_exploration_rate, agent.exploration_rate * 0.9)
 
       if step % 1000 == 0:
-        agent.model.save_weights('/e{}_s{}_{}'.format(
+        agent.model.save_weights('{}/s{}_{}'.format(
           agent.model.logdir,
           train_result.step,
           round(avg_success.value), 3)
         )
+    step += 1
