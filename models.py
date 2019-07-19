@@ -105,7 +105,7 @@ class Sequential:
       input_ = tf.layers.dense(
         input_,
         units=output_size,
-        activation=tf.nn.relu,
+        activation=tf.nn.tanh,
         name='Layer{}'.format(i),
         reuse=reuse,
       )

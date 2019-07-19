@@ -125,8 +125,9 @@ if __name__ == '__main__':
   agent.model.load_weights(agent.model.logdir)
   avg_success = Avg()
 
+  max_difficulty = 1
   for step in range(1000000):
-    difficulty = sample_scramble()
+    difficulty = np.random.randint(low=1, high=max_difficulty+1, size=1)[0]
     success = Avg()
     length = Avg()
 
@@ -135,13 +136,15 @@ if __name__ == '__main__':
       success.update(s)
       if s:
         length.update(l)
-
+    if success.value > 0.8:
+      max_difficulty = min(max_difficulty + 1, 20)
     #success, length = agent.train_online(difficulty)
     train_result = agent.train_on_memory()
     if train_result:
       print(
         'step: {} ({}), loss: {}, acc: {} ({})'.format(train_result.step, step, train_result.loss, success, difficulty)
       )
+
       if difficulty < 10:
         summary = tf.Summary(value=[
           tf.Summary.Value(tag='n_success_rate/{}_success_rate'.format(difficulty), simple_value=success.value),
@@ -154,6 +157,8 @@ if __name__ == '__main__':
           tf.Summary.Value(tag='success_rate', simple_value=avg_success.value),
           tf.Summary.Value(tag='solution_length', simple_value=avg_length.value),
           tf.Summary.Value(tag='exploration_rate', simple_value=agent.exploration_rate),
+          tf.Summary.Value(tag='difficulty', simple_value=difficulty),
+
         ])
         agent.model.writer.add_summary(summary, global_step=train_result.step)
         agent.model.writer.flush()
@@ -165,4 +170,5 @@ if __name__ == '__main__':
           train_result.step,
           round(avg_success.value), 3)
         )
+
     step += 1

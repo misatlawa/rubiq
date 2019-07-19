@@ -11,13 +11,13 @@ model_config = AttrDict(
   {
     'state_size': STATE_SIZE,
     'action_size': len(ALLOWED_MOVES),
-    'hidden_layers_size': [STATE_SIZE, STATE_SIZE, STATE_SIZE, 200],
-    'dtype': tf.float32,
+    'hidden_layers_size': [3*STATE_SIZE, 3*STATE_SIZE, 3*STATE_SIZE, STATE_SIZE],
+    'dtype': tf.float64,
     'optimizer': tf.train.RMSPropOptimizer,
     'learning_rate': 1e-4,
     'update_interval': 500,
     'gamma': 0.8,
-    'logdir': 'logdir/DoubleDQN-RMS'
+    'logdir': 'logdir/DoubleDQN-RMS-offline/'
   }
 )
 
@@ -27,7 +27,7 @@ agent_config = AttrDict(
     'action_size': len(ALLOWED_MOVES),
     'memory_size': 300000,
     'batch_size': 1000,
-    'max_exploration_rate': 1,
+    'max_exploration_rate': 1.,
     'min_exploration_rate': 0.05,
   }
 )
