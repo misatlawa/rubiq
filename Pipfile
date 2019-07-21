@@ -12,7 +12,7 @@ bpython = "*"
 numpy = "*"
 ipython = "*"
 attrdict = "*"
-tensorflow = "1.14"
+tensorflow = "==1.14"
 
 [requires]
 python_version = "3.7"

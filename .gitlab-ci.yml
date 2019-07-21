@@ -6,6 +6,6 @@ tests:
   script:
     - pip install --upgrade pip
     - pip install pipenv
-    - pipenv install --dev
+    - pipenv install --dev --skip-lock
     - pipenv run coverage run -m unittest --verbose
     - pipenv run coverage report --omit='*/site-packages/*'
