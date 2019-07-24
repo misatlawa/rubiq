@@ -14,10 +14,10 @@ model_config = AttrDict(
     'hidden_layers_size': [3*STATE_SIZE, 3*STATE_SIZE, 3*STATE_SIZE, STATE_SIZE],
     'dtype': tf.float64,
     'optimizer': tf.train.RMSPropOptimizer,
-    'learning_rate': 1e-4,
-    'update_interval': 500,
+    'learning_rate': 1e-5,
+    'update_interval': 400,
     'gamma': 0.8,
-    'logdir': 'logdir/DoubleDQN-RMS-offline/'
+    'logdir': 'logdir/DoubleDQN-RMS-ReLU-offline-400/'
   }
 )
 
