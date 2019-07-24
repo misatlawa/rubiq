@@ -105,14 +105,14 @@ class Sequential:
       input_ = tf.layers.dense(
         input_,
         units=output_size,
-        activation=tf.nn.tanh,
+        activation=tf.nn.relu,
         name='Layer{}'.format(i),
         reuse=reuse,
       )
       tf.summary.histogram(input_.name, input_)
 
     q_bias = tf.Variable(
-      initial_value=0,
+      initial_value=np.arctanh(-0.25),
       name='common_bias',
       dtype=self.dtype
     )
