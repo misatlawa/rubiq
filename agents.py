@@ -52,7 +52,8 @@ class DQNAgent:
       return np.random.choice(range(self.action_size))
     return self.model.act(state)
 
-  def play_episode(self, difficulty=None):
+  def play_episode(self, difficulty=None, epsilon=None):
+    epsilon = epsilon or self.exploration_rate
     difficulty = difficulty or sample_scramble()
     self.evaluation_environment.reset()
     self.evaluation_environment.scramble(difficulty)
@@ -61,7 +62,10 @@ class DQNAgent:
     is_terminal = False
     counter = 0
     while not is_terminal:
-      action = self.model.act(state)
+      if np.random.rand() < epsilon:
+        action = np.random.choice(range(self.action_size))
+      else:
+        action = self.model.act(state)
       reward, next_state, is_terminal = self.evaluation_environment(action)
       self.remember(state, action, reward, next_state, is_terminal)
       counter += 1
@@ -112,7 +116,7 @@ class DQNAgent:
     avg_length = Avg()
     avg_success = Avg()
     for _ in tqdm(range(n)):
-      s, l = self.play_episode()
+      s, l = self.play_episode(epsilon=0)
       avg_success.update(s)
       if s and l:
         avg_length.update(l)
@@ -124,8 +128,8 @@ if __name__ == '__main__':
   agent = DQNAgent(agent_config)
   agent.model.load_weights(agent.model.logdir)
   avg_success = Avg()
-
   max_difficulty = 1
+
   for step in range(1000000):
     difficulty = np.random.randint(low=1, high=max_difficulty+1, size=1)[0]
     success = Avg()
@@ -136,8 +140,7 @@ if __name__ == '__main__':
       success.update(s)
       if s:
         length.update(l)
-    if success.value > 0.8:
-      max_difficulty = min(max_difficulty + 1, 20)
+
     #success, length = agent.train_online(difficulty)
     train_result = agent.train_on_memory()
     if train_result:
@@ -145,12 +148,13 @@ if __name__ == '__main__':
         'step: {} ({}), loss: {}, acc: {} ({})'.format(train_result.step, step, train_result.loss, success, difficulty)
       )
 
-      if difficulty < 10:
-        summary = tf.Summary(value=[
-          tf.Summary.Value(tag='n_success_rate/{}_success_rate'.format(difficulty), simple_value=success.value),
-          tf.Summary.Value(tag='n_solution_length/{}_solution_length'.format(difficulty), simple_value=length.value),
-        ])
-        agent.model.writer.add_summary(summary, global_step=train_result.step)
+      summary = tf.Summary(value=[
+        tf.Summary.Value(tag='n_success_rate/{}_success_rate'.format(difficulty), simple_value=success.value),
+        tf.Summary.Value(tag='n_solution_length/{}_solution_length'.format(difficulty), simple_value=length.value),
+      ])
+      agent.model.writer.add_summary(summary, global_step=train_result.step)
+
+
       if step % 10 == 0:
         avg_success, avg_length = agent.evaluation()
         summary = tf.Summary(value=[
@@ -158,7 +162,6 @@ if __name__ == '__main__':
           tf.Summary.Value(tag='solution_length', simple_value=avg_length.value),
           tf.Summary.Value(tag='exploration_rate', simple_value=agent.exploration_rate),
           tf.Summary.Value(tag='difficulty', simple_value=difficulty),
-
         ])
         agent.model.writer.add_summary(summary, global_step=train_result.step)
         agent.model.writer.flush()
@@ -170,5 +173,6 @@ if __name__ == '__main__':
           train_result.step,
           round(avg_success.value), 3)
         )
+        max_difficulty = min(max_difficulty + 1, 20)
 
     step += 1
